@@ -1,2 +1,4 @@
 .pio
 main.z80.bin
+*.lst
+*.rom

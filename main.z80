@@ -1,3 +1,4 @@
+ORG 0x00
 RAM_END equ 0x1000
 LD SP, RAM_END
 
