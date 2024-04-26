@@ -1,6 +1,6 @@
+# Zard80
 <img align="right" src="ReadmePhoto.jpg" width="400" alt="A picture of the Z80 wired to an Arduino Mega."/>
 
-# Zard80
 *Run your Z80 with only an Arduino Mega or similar.*
 
 ---
