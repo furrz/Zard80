@@ -1,0 +1,29 @@
+RAM_END equ 0x1000
+LD SP, RAM_END
+
+LD HL, stra
+call print
+
+; Wait for keypress
+wait:
+IN A, 0x00
+CP 0xFF
+JR NC, wait
+
+LD HL, strb
+call print
+
+DI
+HALT
+
+print_loop:
+    OUT 0x00, A
+print:
+    LD A, (HL)
+    INC HL
+    CP 0
+    JR NZ,print_loop
+    ret
+
+stra: .db "Press any key!\n", 0
+strb: .db "That wasn't the Any key!\n", 0

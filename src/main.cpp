@@ -1,15 +1,12 @@
 #include "pins.h"
 #include "event.h"
 #include "pinutil.h"
+#include "z80mem.h"
 #include <Arduino.h>
-
-#define MEMORY_MAX 2048
-uint8_t memory[MEMORY_MAX] = {
-};
 
 void setup()
 {
-    Serial.begin(9600);
+    Serial.begin(115200);
     while (!Serial) {}
 
     Serial.println("[Zard80] Online\n");
@@ -32,41 +29,47 @@ void loop()
     PinUtil::pulseClock();
 
     uint16_t address = ZPin::ADDRESS.Read();
-    bool m1 = digitalRead(ZPin::M1) == LOW;
-    bool mem = digitalRead(ZPin::MREQ) == LOW;
-    bool io = digitalRead(ZPin::IORQ) == LOW;
-    bool write = digitalRead(ZPin::WR) == LOW;
-    bool read = digitalRead(ZPin::RD) == LOW;
-    bool halt = digitalRead(ZPin::HALT) == LOW;
+    const bool m1 = digitalRead(ZPin::M1) == LOW;
+    const bool mem = digitalRead(ZPin::MREQ) == LOW;
+    const bool io = digitalRead(ZPin::IORQ) == LOW;
+    const bool write = digitalRead(ZPin::WR) == LOW;
+    const bool read = digitalRead(ZPin::RD) == LOW;
+    const bool halt = digitalRead(ZPin::HALT) == LOW;
 
     if (halt) terminate("HALT was set low");
     if (read && write) terminate("RD and WR cannot be low simultaneously");
 
     if ((m1 || mem) && read) {
         ZPin::DATA.PinMode(OUTPUT);
-        ZPin::DATA.Write(memory[address % MEMORY_MAX]);
+
+        const uint8_t data = address < ZMem::MEMORY_MAX ? ZMem::memory[address] : 0x00;
+        ZPin::DATA.Write(data);
         Event::Log(m1 ? Event::EV_FETCH : Event::EV_READ,
-                   address,
-                   memory[address % MEMORY_MAX]);
-        // TODO: Do we need to pulse once with WAIT low? Try without, first.
+                   address, data);
+
+        if (address >= ZMem::MEMORY_MAX) terminate("Memory Operation Out of Range");
+
         PinUtil::pulseClockWhilePinLow(ZPin::RD);
         ZPin::DATA.PinMode(INPUT);
     } else if (mem && write) {
-        memory[address % MEMORY_MAX] = ZPin::DATA.Read();
-        Event::Log(Event::EV_WRITE, address, memory[address % MEMORY_MAX]);
+        const uint8_t data = ZPin::DATA.Read();
+        Event::Log(Event::EV_WRITE, address, data);
+        if (address < ZMem::MEMORY_MAX) ZMem::memory[address] = data;
+        else terminate("Memory Operation Out of Range");
         PinUtil::pulseClockWhilePinLow(ZPin::WR);
     } else if (io && read) {
         ZPin::DATA.PinMode(OUTPUT);
         address &= 0xFF;
-
         uint8_t result = 0xFF;
 
         switch (address) {
         case 0:
-            // IO Read
+            // Serial IO Read
             if (Serial.available()) result = Serial.read();
             break;
-        default:break;
+        default:
+            Event::Log(Event::EV_IO_READ, address, result);
+            terminate("IO Operation Out of Range");
         }
 
         ZPin::DATA.Write(result);
@@ -75,17 +78,19 @@ void loop()
         ZPin::DATA.PinMode(INPUT);
     } else if (io && write) {
         address &= 0xFF;
-        uint8_t data = ZPin::DATA.Read();
-
-        switch (address) {
-        case 0:Serial.write((char) data);
-            break;
-        default:break;
-        }
+        const uint8_t data = ZPin::DATA.Read();
 
         Event::Log(Event::EV_IO_WRITE, address, data);
+
+        switch (address) {
+        case 0:
+            // Serial IO Write
+            Serial.write(static_cast<char>(data));
+            break;
+        default:
+            terminate("IO Operation Out of Range");
+        }
+
         PinUtil::pulseClockWhilePinLow(ZPin::WR);
     }
-
-    terminate("Not Implemented");
 }

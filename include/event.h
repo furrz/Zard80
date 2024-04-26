@@ -2,10 +2,14 @@
 
 #include <stdint.h>
 
-/// CPU Event Logging
+/// CPU Event Logging: Logs requests from the Z80 to the Arduino.
 namespace Event
 {
-    constexpr int MAX_EVENTS = 128;
+    /// Maximum buffer of events logged immediately after startup.
+    constexpr unsigned MAX_INITIAL_EVENTS = 128;
+
+    /// Maximum ring buffer of recently logged events.
+    constexpr unsigned MAX_RECENT_EVENTS = 128;
 
     /// Unsigned of CPU Event
     enum EventType
